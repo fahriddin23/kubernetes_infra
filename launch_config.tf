@@ -23,7 +23,7 @@ resource "aws_launch_configuration" "bastions-kubernetesfahridd-com" {
 resource "aws_launch_configuration" "master-us-east-2a-masters-kubernetesfahridd-com" {
   name_prefix                 = "master-us-east-2a.masters.kubernetesfahridd.com-"
   image_id                    = "ami-0dd3b1702120579bd"
-  instance_type               = "t2.micro"
+  instance_type               = "${var.master_instance_type}"
   key_name                    = "${aws_key_pair.kubernetes-kubernetesfahridd-com-b6f7b12c407cddada9185d57f00987ba.id}"
   iam_instance_profile        = "${aws_iam_instance_profile.masters-kubernetesfahridd-com.id}"
   security_groups             = ["${aws_security_group.masters-kubernetesfahridd-com.id}"]
@@ -46,7 +46,7 @@ resource "aws_launch_configuration" "master-us-east-2a-masters-kubernetesfahridd
 resource "aws_launch_configuration" "master-us-east-2b-masters-kubernetesfahridd-com" {
   name_prefix                 = "master-us-east-2b.masters.kubernetesfahridd.com-"
   image_id                    = "ami-0dd3b1702120579bd"
-  instance_type               = "t2.micro"
+  instance_type               = "${var.master_instance_type}"
   key_name                    = "${aws_key_pair.kubernetes-kubernetesfahridd-com-b6f7b12c407cddada9185d57f00987ba.id}"
   iam_instance_profile        = "${aws_iam_instance_profile.masters-kubernetesfahridd-com.id}"
   security_groups             = ["${aws_security_group.masters-kubernetesfahridd-com.id}"]
@@ -69,7 +69,7 @@ resource "aws_launch_configuration" "master-us-east-2b-masters-kubernetesfahridd
 resource "aws_launch_configuration" "master-us-east-2c-masters-kubernetesfahridd-com" {
   name_prefix                 = "master-us-east-2c.masters.kubernetesfahridd.com-"
   image_id                    = "ami-0dd3b1702120579bd"
-  instance_type               = "t2.micro"
+  instance_type               = "${var.master_instance_type}"
   key_name                    = "${aws_key_pair.kubernetes-kubernetesfahridd-com-b6f7b12c407cddada9185d57f00987ba.id}"
   iam_instance_profile        = "${aws_iam_instance_profile.masters-kubernetesfahridd-com.id}"
   security_groups             = ["${aws_security_group.masters-kubernetesfahridd-com.id}"]
@@ -92,7 +92,7 @@ resource "aws_launch_configuration" "master-us-east-2c-masters-kubernetesfahridd
 resource "aws_launch_configuration" "nodes-kubernetesfahridd-com" {
   name_prefix                 = "nodes.kubernetesfahridd.com-"
   image_id                    = "ami-0dd3b1702120579bd"
-  instance_type               = "t2.micro"
+  instance_type               = "${var.node_instance_type}"
   key_name                    = "${aws_key_pair.kubernetes-kubernetesfahridd-com-b6f7b12c407cddada9185d57f00987ba.id}"
   iam_instance_profile        = "${aws_iam_instance_profile.nodes-kubernetesfahridd-com.id}"
   security_groups             = ["${aws_security_group.nodes-kubernetesfahridd-com.id}"]
