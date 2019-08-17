@@ -1,4 +1,8 @@
 locals = {
+  bastion_autoscaling_group_ids     = ["${aws_autoscaling_group.bastions-kubernetesfahridd-com.id}"]
+  bastion_security_group_ids        = ["${aws_security_group.bastion-kubernetesfahridd-com.id}"]
+  bastions_role_arn                 = "${aws_iam_role.bastions-kubernetesfahridd-com.arn}"
+  bastions_role_name                = "${aws_iam_role.bastions-kubernetesfahridd-com.name}"
   cluster_name                      = "kubernetesfahridd.com"
   master_autoscaling_group_ids      = ["${aws_autoscaling_group.master-us-east-2a-masters-kubernetesfahridd-com.id}", "${aws_autoscaling_group.master-us-east-2b-masters-kubernetesfahridd-com.id}", "${aws_autoscaling_group.master-us-east-2c-masters-kubernetesfahridd-com.id}"]
   master_security_group_ids         = ["${aws_security_group.masters-kubernetesfahridd-com.id}"]
@@ -22,6 +26,22 @@ locals = {
   subnet_utility-us-east-2c_id      = "${aws_subnet.utility-us-east-2c-kubernetesfahridd-com.id}"
   vpc_cidr_block                    = "${aws_vpc.kubernetesfahridd-com.cidr_block}"
   vpc_id                            = "${aws_vpc.kubernetesfahridd-com.id}"
+}
+
+output "bastion_autoscaling_group_ids" {
+  value = ["${aws_autoscaling_group.bastions-kubernetesfahridd-com.id}"]
+}
+
+output "bastion_security_group_ids" {
+  value = ["${aws_security_group.bastion-kubernetesfahridd-com.id}"]
+}
+
+output "bastions_role_arn" {
+  value = "${aws_iam_role.bastions-kubernetesfahridd-com.arn}"
+}
+
+output "bastions_role_name" {
+  value = "${aws_iam_role.bastions-kubernetesfahridd-com.name}"
 }
 
 output "cluster_name" {
@@ -120,6 +140,11 @@ provider "aws" {
   region = "us-east-2"
 }
 
+resource "aws_autoscaling_attachment" "bastions-kubernetesfahridd-com" {
+  elb                    = "${aws_elb.bastion-kubernetesfahridd-com.id}"
+  autoscaling_group_name = "${aws_autoscaling_group.bastions-kubernetesfahridd-com.id}"
+}
+
 resource "aws_autoscaling_attachment" "master-us-east-2a-masters-kubernetesfahridd-com" {
   elb                    = "${aws_elb.api-kubernetesfahridd-com.id}"
   autoscaling_group_name = "${aws_autoscaling_group.master-us-east-2a-masters-kubernetesfahridd-com.id}"
@@ -133,6 +158,41 @@ resource "aws_autoscaling_attachment" "master-us-east-2b-masters-kubernetesfahri
 resource "aws_autoscaling_attachment" "master-us-east-2c-masters-kubernetesfahridd-com" {
   elb                    = "${aws_elb.api-kubernetesfahridd-com.id}"
   autoscaling_group_name = "${aws_autoscaling_group.master-us-east-2c-masters-kubernetesfahridd-com.id}"
+}
+
+resource "aws_autoscaling_group" "bastions-kubernetesfahridd-com" {
+  name                 = "bastions.kubernetesfahridd.com"
+  launch_configuration = "${aws_launch_configuration.bastions-kubernetesfahridd-com.id}"
+  max_size             = 1
+  min_size             = 1
+  vpc_zone_identifier  = ["${aws_subnet.utility-us-east-2a-kubernetesfahridd-com.id}", "${aws_subnet.utility-us-east-2b-kubernetesfahridd-com.id}", "${aws_subnet.utility-us-east-2c-kubernetesfahridd-com.id}"]
+
+  tag = {
+    key                 = "KubernetesCluster"
+    value               = "kubernetesfahridd.com"
+    propagate_at_launch = true
+  }
+
+  tag = {
+    key                 = "Name"
+    value               = "bastions.kubernetesfahridd.com"
+    propagate_at_launch = true
+  }
+
+  tag = {
+    key                 = "k8s.io/cluster-autoscaler/node-template/label/kops.k8s.io/instancegroup"
+    value               = "bastions"
+    propagate_at_launch = true
+  }
+
+  tag = {
+    key                 = "k8s.io/role/bastion"
+    value               = "1"
+    propagate_at_launch = true
+  }
+
+  metrics_granularity = "1Minute"
+  enabled_metrics     = ["GroupDesiredCapacity", "GroupInServiceInstances", "GroupMaxSize", "GroupMinSize", "GroupPendingInstances", "GroupStandbyInstances", "GroupTerminatingInstances", "GroupTotalInstances"]
 }
 
 resource "aws_autoscaling_group" "master-us-east-2a-masters-kubernetesfahridd-com" {
@@ -425,6 +485,41 @@ resource "aws_elb" "api-kubernetesfahridd-com" {
   }
 }
 
+resource "aws_elb" "bastion-kubernetesfahridd-com" {
+  name = "bastion-kubernetesfahridd-mf9cn1"
+
+  listener = {
+    instance_port     = 22
+    instance_protocol = "TCP"
+    lb_port           = 22
+    lb_protocol       = "TCP"
+  }
+
+  security_groups = ["${aws_security_group.bastion-elb-kubernetesfahridd-com.id}"]
+  subnets         = ["${aws_subnet.utility-us-east-2a-kubernetesfahridd-com.id}", "${aws_subnet.utility-us-east-2b-kubernetesfahridd-com.id}", "${aws_subnet.utility-us-east-2c-kubernetesfahridd-com.id}"]
+
+  health_check = {
+    target              = "TCP:22"
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    interval            = 10
+    timeout             = 5
+  }
+
+  idle_timeout = 300
+
+  tags = {
+    KubernetesCluster                             = "kubernetesfahridd.com"
+    Name                                          = "bastion.kubernetesfahridd.com"
+    "kubernetes.io/cluster/kubernetesfahridd.com" = "owned"
+  }
+}
+
+resource "aws_iam_instance_profile" "bastions-kubernetesfahridd-com" {
+  name = "bastions.kubernetesfahridd.com"
+  role = "${aws_iam_role.bastions-kubernetesfahridd-com.name}"
+}
+
 resource "aws_iam_instance_profile" "masters-kubernetesfahridd-com" {
   name = "masters.kubernetesfahridd.com"
   role = "${aws_iam_role.masters-kubernetesfahridd-com.name}"
@@ -435,6 +530,11 @@ resource "aws_iam_instance_profile" "nodes-kubernetesfahridd-com" {
   role = "${aws_iam_role.nodes-kubernetesfahridd-com.name}"
 }
 
+resource "aws_iam_role" "bastions-kubernetesfahridd-com" {
+  name               = "bastions.kubernetesfahridd.com"
+  assume_role_policy = "${file("${path.module}/data/aws_iam_role_bastions.kubernetesfahridd.com_policy")}"
+}
+
 resource "aws_iam_role" "masters-kubernetesfahridd-com" {
   name               = "masters.kubernetesfahridd.com"
   assume_role_policy = "${file("${path.module}/data/aws_iam_role_masters.kubernetesfahridd.com_policy")}"
@@ -443,6 +543,12 @@ resource "aws_iam_role" "masters-kubernetesfahridd-com" {
 resource "aws_iam_role" "nodes-kubernetesfahridd-com" {
   name               = "nodes.kubernetesfahridd.com"
   assume_role_policy = "${file("${path.module}/data/aws_iam_role_nodes.kubernetesfahridd.com_policy")}"
+}
+
+resource "aws_iam_role_policy" "bastions-kubernetesfahridd-com" {
+  name   = "bastions.kubernetesfahridd.com"
+  role   = "${aws_iam_role.bastions-kubernetesfahridd-com.name}"
+  policy = "${file("${path.module}/data/aws_iam_role_policy_bastions.kubernetesfahridd.com_policy")}"
 }
 
 resource "aws_iam_role_policy" "masters-kubernetesfahridd-com" {
@@ -470,6 +576,28 @@ resource "aws_internet_gateway" "kubernetesfahridd-com" {
 resource "aws_key_pair" "kubernetes-kubernetesfahridd-com-b6f7b12c407cddada9185d57f00987ba" {
   key_name   = "kubernetes.kubernetesfahridd.com-b6:f7:b1:2c:40:7c:dd:ad:a9:18:5d:57:f0:09:87:ba"
   public_key = "${file("${path.module}/data/aws_key_pair_kubernetes.kubernetesfahridd.com-b6f7b12c407cddada9185d57f00987ba_public_key")}"
+}
+
+resource "aws_launch_configuration" "bastions-kubernetesfahridd-com" {
+  name_prefix                 = "bastions.kubernetesfahridd.com-"
+  image_id                    = "ami-0dd3b1702120579bd"
+  instance_type               = "t2.micro"
+  key_name                    = "${aws_key_pair.kubernetes-kubernetesfahridd-com-b6f7b12c407cddada9185d57f00987ba.id}"
+  iam_instance_profile        = "${aws_iam_instance_profile.bastions-kubernetesfahridd-com.id}"
+  security_groups             = ["${aws_security_group.bastion-kubernetesfahridd-com.id}"]
+  associate_public_ip_address = true
+
+  root_block_device = {
+    volume_type           = "gp2"
+    volume_size           = 32
+    delete_on_termination = true
+  }
+
+  lifecycle = {
+    create_before_destroy = true
+  }
+
+  enable_monitoring = false
 }
 
 resource "aws_launch_configuration" "master-us-east-2a-masters-kubernetesfahridd-com" {
@@ -634,6 +762,19 @@ resource "aws_route53_record" "api-kubernetesfahridd-com" {
   zone_id = "/hostedzone/Z1UEGSIL1LNKZ1"
 }
 
+resource "aws_route53_record" "bastion-kubernetesfahridd-com" {
+  name = "bastion.kubernetesfahridd.com"
+  type = "A"
+
+  alias = {
+    name                   = "${aws_elb.bastion-kubernetesfahridd-com.dns_name}"
+    zone_id                = "${aws_elb.bastion-kubernetesfahridd-com.zone_id}"
+    evaluate_target_health = false
+  }
+
+  zone_id = "/hostedzone/Z1UEGSIL1LNKZ1"
+}
+
 resource "aws_route53_zone_association" "Z1UEGSIL1LNKZ1" {
   zone_id = "/hostedzone/Z1UEGSIL1LNKZ1"
   vpc_id  = "${aws_vpc.kubernetesfahridd-com.id}"
@@ -725,6 +866,30 @@ resource "aws_security_group" "api-elb-kubernetesfahridd-com" {
   }
 }
 
+resource "aws_security_group" "bastion-elb-kubernetesfahridd-com" {
+  name        = "bastion-elb.kubernetesfahridd.com"
+  vpc_id      = "${aws_vpc.kubernetesfahridd-com.id}"
+  description = "Security group for bastion ELB"
+
+  tags = {
+    KubernetesCluster                             = "kubernetesfahridd.com"
+    Name                                          = "bastion-elb.kubernetesfahridd.com"
+    "kubernetes.io/cluster/kubernetesfahridd.com" = "owned"
+  }
+}
+
+resource "aws_security_group" "bastion-kubernetesfahridd-com" {
+  name        = "bastion.kubernetesfahridd.com"
+  vpc_id      = "${aws_vpc.kubernetesfahridd-com.id}"
+  description = "Security group for bastion"
+
+  tags = {
+    KubernetesCluster                             = "kubernetesfahridd.com"
+    Name                                          = "bastion.kubernetesfahridd.com"
+    "kubernetes.io/cluster/kubernetesfahridd.com" = "owned"
+  }
+}
+
 resource "aws_security_group" "masters-kubernetesfahridd-com" {
   name        = "masters.kubernetesfahridd.com"
   vpc_id      = "${aws_vpc.kubernetesfahridd-com.id}"
@@ -783,6 +948,42 @@ resource "aws_security_group_rule" "api-elb-egress" {
   to_port           = 0
   protocol          = "-1"
   cidr_blocks       = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "bastion-egress" {
+  type              = "egress"
+  security_group_id = "${aws_security_group.bastion-kubernetesfahridd-com.id}"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "bastion-elb-egress" {
+  type              = "egress"
+  security_group_id = "${aws_security_group.bastion-elb-kubernetesfahridd-com.id}"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "bastion-to-master-ssh" {
+  type                     = "ingress"
+  security_group_id        = "${aws_security_group.masters-kubernetesfahridd-com.id}"
+  source_security_group_id = "${aws_security_group.bastion-kubernetesfahridd-com.id}"
+  from_port                = 22
+  to_port                  = 22
+  protocol                 = "tcp"
+}
+
+resource "aws_security_group_rule" "bastion-to-node-ssh" {
+  type                     = "ingress"
+  security_group_id        = "${aws_security_group.nodes-kubernetesfahridd-com.id}"
+  source_security_group_id = "${aws_security_group.bastion-kubernetesfahridd-com.id}"
+  from_port                = 22
+  to_port                  = 22
+  protocol                 = "tcp"
 }
 
 resource "aws_security_group_rule" "https-api-elb-0-0-0-0--0" {
@@ -866,18 +1067,18 @@ resource "aws_security_group_rule" "node-to-master-udp-1-65535" {
   protocol                 = "udp"
 }
 
-resource "aws_security_group_rule" "ssh-external-to-master-0-0-0-0--0" {
-  type              = "ingress"
-  security_group_id = "${aws_security_group.masters-kubernetesfahridd-com.id}"
-  from_port         = 22
-  to_port           = 22
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
+resource "aws_security_group_rule" "ssh-elb-to-bastion" {
+  type                     = "ingress"
+  security_group_id        = "${aws_security_group.bastion-kubernetesfahridd-com.id}"
+  source_security_group_id = "${aws_security_group.bastion-elb-kubernetesfahridd-com.id}"
+  from_port                = 22
+  to_port                  = 22
+  protocol                 = "tcp"
 }
 
-resource "aws_security_group_rule" "ssh-external-to-node-0-0-0-0--0" {
+resource "aws_security_group_rule" "ssh-external-to-bastion-elb-0-0-0-0--0" {
   type              = "ingress"
-  security_group_id = "${aws_security_group.nodes-kubernetesfahridd-com.id}"
+  security_group_id = "${aws_security_group.bastion-elb-kubernetesfahridd-com.id}"
   from_port         = 22
   to_port           = 22
   protocol          = "tcp"
