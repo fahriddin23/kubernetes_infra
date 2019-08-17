@@ -1,8 +1,8 @@
 resource "aws_autoscaling_group" "nodes-kubernetesfahridd-com" {
   name                 = "nodes.kubernetesfahridd.com"
   launch_configuration = "${aws_launch_configuration.nodes-kubernetesfahridd-com.id}"
-  max_size             = 2
-  min_size             = 2
+  max_size             = "${var.node_max_size}"
+  min_size             = "${var.node_min_size}"
   vpc_zone_identifier  = ["${aws_subnet.us-east-2a-kubernetesfahridd-com.id}", "${aws_subnet.us-east-2b-kubernetesfahridd-com.id}", "${aws_subnet.us-east-2c-kubernetesfahridd-com.id}"]
 
   tag = {
